@@ -9,7 +9,7 @@ defmodule Vaultex do
 
     children = [
       # Define workers and child supervisors to be supervised
-      # worker(Vaultex.Worker, [arg1, arg2, arg3]),
+      worker(Vaultex.Client, []),
     ]
 
     Logger.debug("Creating ETS tables for #{__MODULE__}")
@@ -25,4 +25,5 @@ defmodule Vaultex do
     opts = [strategy: :one_for_one, name: Vaultex.Supervisor]
     Supervisor.start_link(children, opts)
   end
+
 end

@@ -1,8 +1,20 @@
 defmodule VaultexTest do
-  use ExUnit.Case
-  doctest Vaultex
+  use ExUnit.Case, async: false
+  # doctest Vaultex
 
-  test "the truth" do
-    assert 1 + 1 == 2
+
+  test "authenticate the app" do
+    res = Vaultex.Client.auth({:user_id, "bar"})
+    assert res == {:ok, :authenticated}
+  end
+
+  test "write secret/foo" do
+    {:ok, data} = Vaultex.Client.write("secret/foo", %{"value" => "bar"})
+    assert data == %{"value" => "bar"}
+  end
+
+  test "read secret/foo" do
+    {:ok, data} = Vaultex.Client.get("secret/foo")
+    assert data == %{"value" => "bar"}
   end
 end

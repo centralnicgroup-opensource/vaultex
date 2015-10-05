@@ -1,31 +1,50 @@
-defmodule Vaultex.Interface do
+defmodule Vaultex.Client do
 
   require Logger
   use GenServer
   @version "v1"
   @cache Elixir.Vaultex
 
-  def start_link(user_id) do
-    GenServer.start_link(__MODULE__, %{progress: "starting", user_id: user_id}, name: :vault)
+  def start_link() do
+    GenServer.start_link(__MODULE__, %{progress: "starting"}, name: :vault)
   end
 
-  def get(key) do
-    GenServer.call(:vault, {:get, key})
+  def auth(creds) do
+    GenServer.call(:vault, {:auth, creds})
+  end
+
+  def read(key) do
+    GenServer.call(:vault, {:read, key})
+  end
+
+  def write(key, data) do
+    GenServer.call(:vault, {:write, key, data})
   end
 
 
 # GenServer callbacks
 
   def init(state) do
-    app_id = Application.get_env(:vaultex, :app_id, nil)
     url = "#{get_env(:scheme)}://#{get_env(:host)}:#{get_env(:port)}/#{@version}/"
-    {:ok, req} = request(:post, "#{url}auth/app-id/login", %{app_id: app_id, user_id: state.user_id})
-    Logger.debug("Got auth reponse: #{inspect req}")
-
-	{:ok, Map.merge(state, %{url: url, token: req["auth"]["client_token"]})}
+	{:ok, Map.merge(state, %{url: url})}
   end
 
-  def handle_call({:get, key}, _from, state) do
+  # authenticate and save the access token in `token`
+  def handle_call({:auth, {:user_id, user_id}}, _from, state) do
+    app_id = Application.get_env(:vaultex, :app_id, nil)
+    # TODO should call write here now that we have it
+    {:ok, req} = request(:post, "#{state.url}auth/app-id/login", %{app_id: app_id, user_id: user_id})
+    Logger.debug("Got auth reponse: #{inspect req}")
+
+	{:reply, {:ok, :authenticated}, Map.merge(state, %{token: req["auth"]["client_token"]})}
+  end
+  def handle_call({:auth, {:token, token}}, _from, state) do
+    Logger.debug("Merged in token auth")
+	{:reply, {:ok, :authenticated}, Map.merge(state, %{token: token})}
+  end
+
+
+  def handle_call({:read, key}, _from, state) do
     data = case :ets.lookup(@cache, key) do
       [] ->
         {:ok, req} = request(:get, state.url <> key, nil, state.token)
@@ -39,6 +58,17 @@ defmodule Vaultex.Interface do
       [{_, stuff}] -> stuff
     end
     {:reply, data, state}
+  end
+
+  def handle_call({:write, key, data}, _from, state) do
+    case request(:post, state.url <> key, data, state.token) do
+      {:ok, req} -> 
+        Logger.debug("Got reponse: #{inspect req}")
+        {:reply, req, state}
+      {:error, error} ->
+        Logger.debug("Got error: #{inspect error}")
+        {:reply, error, state}
+    end
   end
 
   def handle_info({:purge, key}, state) do
@@ -57,6 +87,7 @@ defmodule Vaultex.Interface do
     case get_content(method, url, params, auth) do
       {:ok, code, _headers, body_ref} ->
         {:ok, res} = :hackney.body body_ref
+        Logger.debug("[body] #{inspect res}")
 		case Poison.decode(res) do
 		  {:ok, json} ->
 			cond do
