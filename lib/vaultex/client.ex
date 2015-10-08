@@ -57,17 +57,17 @@ defmodule Vaultex.Client do
         req["data"]
       [{_, stuff}] -> stuff
     end
-    {:reply, data, state}
+    {:reply, {:ok, data}, state}
   end
 
   def handle_call({:write, key, data}, _from, state) do
     case request(:post, state.url <> key, data, state.token) do
       {:ok, req} -> 
         Logger.debug("Got reponse: #{inspect req}")
-        {:reply, req, state}
+        {:reply, {:ok, req}, state}
       {:error, error} ->
         Logger.debug("Got error: #{inspect error}")
-        {:reply, error, state}
+        {:reply, {:error, error}, state}
     end
   end
 
@@ -101,7 +101,10 @@ defmodule Vaultex.Client do
 				{:error, res}
 			end
 		  {:error, json_err} ->
-			  {:error, json_err}
+            case res do
+              "" -> {:ok, :no_data}
+			  _  -> {:error, json_err}
+            end
 		end
       error -> error
     end
@@ -114,6 +117,7 @@ defmodule Vaultex.Client do
         [{"Content-Type", "application/json"}, {"X-Vault-Token", token}]
     end
     Logger.debug("[#{method}] #{url}")
+    Logger.debug("[HEADER] #{inspect headers}")
 
     case Poison.encode(params) do
       # empty params
