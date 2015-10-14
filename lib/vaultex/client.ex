@@ -17,8 +17,20 @@ defmodule Vaultex.Client do
     GenServer.call(:vault, {:read, key})
   end
 
+  def write(key) do
+    GenServer.call(:vault, {:write, key, nil})
+  end
+
   def write(key, data) do
     GenServer.call(:vault, {:write, key, data})
+  end
+
+  def encrypt(key, data) do
+    GenServer.call(:vault, {:encrypt, key, data})
+  end
+
+  def decrypt(key, data) do
+    GenServer.call(:vault, {:decrypt, key, data})
   end
 
 
@@ -50,9 +62,12 @@ defmodule Vaultex.Client do
         {:ok, req} = request(:get, state.url <> key, nil, state.token)
         Logger.debug("Got reponse: #{inspect req}")
         :ets.insert(@cache, {key, req["data"]})
-        if req["lease_duration"] > 0 do
+        case req["lease_duration"] do
+          nil -> Logger.debug("No lease duration, no need to purge the key later")
+          sec ->
             # notify me and delete the ETS cache
-            :erlang.send_after(req["lease_duration"], __MODULE__, {:purge, key})
+            Logger.debug("Purge the key from our internal cache after #{sec} seconds")
+            :erlang.send_after(sec, __MODULE__, {:purge, key})
         end
         req["data"]
       [{_, stuff}] -> stuff
