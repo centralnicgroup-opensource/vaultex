@@ -1,11 +1,11 @@
 defmodule VaultexTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case
   # doctest Vaultex
 
 
-  test "authenticate the app" do
-    res = Vaultex.Client.auth({:user_id, "bar"})
-    assert res == {:ok, :authenticated}
+  setup do
+    {:ok, :authenticated} = Vaultex.Client.auth({:user_id, "bar"})
+    :ok
   end
 
   test "write secret/foo" do
@@ -14,16 +14,15 @@ defmodule VaultexTest do
   end
 
   test "read secret/foo" do
-    # every now and then vault is too slow on my laptop and triggers a
-    # false positive here :( [norbu09]
+    # write first then read
+    {:ok, _data} = Vaultex.Client.write("secret/foo", %{"value" => "bar"})
     {:ok, data} = Vaultex.Client.read("secret/foo")
     assert data == %{"value" => "bar"}
   end
 
   test "encrypt some data" do
     text = "This is secure!"
-    {:ok, res} = Vaultex.Client.write("transit/encrypt/foo",
-      %{"plaintext" => text  |> Base.encode64})
+    {:ok, res} = Vaultex.Client.encrypt("foo", %{"plaintext" => text})
     assert Map.keys(res["data"]) == ["ciphertext"]
     IO.puts("Got encrypted string: #{res["data"]["ciphertext"]}")
 
@@ -31,8 +30,7 @@ defmodule VaultexTest do
     {:ok, res1} = Vaultex.Client.write("transit/decrypt/foo", %{"ciphertext" => res["data"]["ciphertext"]})
 
     # test round trip
-    {:ok, text1} = res1["data"]["plaintext"] |> Base.decode64
-    assert text == text1
+    assert text == res1["data"]["plaintext"]
     
   end
 end

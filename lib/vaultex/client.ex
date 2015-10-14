@@ -26,11 +26,11 @@ defmodule Vaultex.Client do
   end
 
   def encrypt(key, data) do
-    GenServer.call(:vault, {:encrypt, key, data})
+    GenServer.call(:vault, {:encrypt, key, data}, 10000)
   end
 
   def decrypt(key, data) do
-    GenServer.call(:vault, {:decrypt, key, data})
+    GenServer.call(:vault, {:decrypt, key, data}, 10000)
   end
 
 
@@ -83,6 +83,23 @@ defmodule Vaultex.Client do
       {:error, error} ->
         Logger.debug("Got error: #{inspect error}")
         {:reply, {:error, error}, state}
+    end
+  end
+
+  def handle_call({:encrypt, key, data}, _from, state) do
+    data1 = %{data | "plaintext" => data["plaintext"] |> Base.encode64 }
+    res = request(:post, "#{state.url}transit/encrypt/#{key}", data1, state.token)
+    {:reply, res, state}
+  end
+
+  def handle_call({:decrypt, key, data}, _from, state) do
+    case request(:post, "#{state.url}transit/decrypt/#{key}", data, state.token) do
+      {:ok, data} ->
+        {:ok, plain} = data["plaintext"] |> Base.decode64
+        data1 = %{data | "plaintext" => plain }
+        {:reply, {:ok, data1}, state}
+      error -> 
+        {:reply, error, state}
     end
   end
 
