@@ -163,10 +163,10 @@ defmodule Vaultex.Client do
   end
 
   defp get_env(:host) do
-      System.get_env("VAULT_PORT_8200_TCP_ADDR") || Application.get_env(:vaultex, :host) || "localhost"
+      System.get_env("VAULT_HOST") || Application.get_env(:vaultex, :host) || "localhost"
   end
   defp get_env(:port) do
-      System.get_env("VAULT_PORT_8200_TCP_PORT") || Application.get_env(:vaultex, :port) || 8200
+      System.get_env("VAULT_PORT") || Application.get_env(:vaultex, :port) || 8200
   end
   defp get_env(:scheme) do
       System.get_env("VAULT_SCHEME") || Application.get_env(:vaultex, :scheme) || "http"
