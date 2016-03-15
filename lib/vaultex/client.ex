@@ -38,7 +38,14 @@ defmodule Vaultex.Client do
 
   def init(state) do
     url = "#{get_env(:scheme)}://#{get_env(:host)}:#{get_env(:port)}/#{@version}/"
-	{:ok, Map.merge(state, %{url: url})}
+    {:ok, Map.merge(state, %{url: url})}
+  end
+
+  def handle_call({:auth, {:github, github_token}}, _from, state) do
+    {:ok, req} = request(:post, "#{state.url}auth/github/login", %{token: github_token})
+    Logger.debug("Got auth response: #{inspect req}")
+
+    {:reply, {:ok, :authenticated}, Map.merge(state, %{token: req["auth"]["client_token"]})} 
   end
 
   # authenticate and save the access token in `token`
@@ -48,8 +55,9 @@ defmodule Vaultex.Client do
     {:ok, req} = request(:post, "#{state.url}auth/app-id/login", %{app_id: app_id, user_id: user_id})
     Logger.debug("Got auth reponse: #{inspect req}")
 
-	{:reply, {:ok, :authenticated}, Map.merge(state, %{token: req["auth"]["client_token"]})}
+    {:reply, {:ok, :authenticated}, Map.merge(state, %{token: req["auth"]["client_token"]})}
   end
+
   def handle_call({:auth, {:token, token}}, _from, state) do
     Logger.debug("Merged in token auth")
 	{:reply, {:ok, :authenticated}, Map.merge(state, %{token: token})}
