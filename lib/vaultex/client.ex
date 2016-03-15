@@ -117,27 +117,17 @@ defmodule Vaultex.Client do
   end
   defp request(method, url, params, auth) do
     case get_content(method, url, params, auth) do
-      {:ok, code, _headers, body_ref} ->
-        {:ok, res} = :hackney.body body_ref
+      {:ok, %HTTPoison.Response{status_code: 200, body: res}} ->
         Logger.debug("[body] #{inspect res}")
-		case Poison.decode(res) do
-		  {:ok, json} ->
-			cond do
-			  200 ->
-				{:ok, json}
-			  204 ->
-				{:ok, :no_data}
-			  code in 400..599 ->
-				{:error, {{:http_status, code}, json}}
-			  true ->
-				{:error, res}
-			end
-		  {:error, json_err} ->
+        case Poison.decode(res) do
+          {:ok, json} ->
+            {:ok, json}
+          {:error, json_err} ->
             case res do
               "" -> {:ok, :no_data}
-			  _  -> {:error, json_err}
+              _  -> {:error, json_err}
             end
-		end
+        end
       error -> error
     end
   end
@@ -154,10 +144,12 @@ defmodule Vaultex.Client do
     case Poison.encode(params) do
       # empty params
       {:ok, "null"} ->
-        :hackney.request(method, url, headers)
+        HTTPoison.request(method, url, "", headers, [hackney: [ssl_options: [versions: [:"tlsv1.2"]]]])
+
       {:ok, json} ->
         Logger.debug("[JSON] #{inspect json}")
-        :hackney.request(method, url, headers, json)
+        HTTPoison.request(method, url, json, headers, [hackney: [ssl_options: [versions: [:"tlsv1.2"]]]])
+
       error -> error
     end
   end

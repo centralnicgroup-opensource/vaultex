@@ -14,7 +14,7 @@ defmodule Vaultex.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger, :hackney, :poison],
+    [applications: [:logger, :httpoison, :poison],
      mod: {Vaultex, []}]
   end
 
@@ -28,8 +28,8 @@ defmodule Vaultex.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-	[{:hackney, "~> 1.3"},
-	  {:poison, "~> 1.5"}
+	[{:httpoison, "~> 0.8.1"},
+	 {:poison, "~> 1.5"}
 	]
   end
 end
