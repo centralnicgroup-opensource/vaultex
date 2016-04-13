@@ -152,11 +152,11 @@ defmodule Vaultex.Client do
     case Poison.encode(params) do
       # empty params
       {:ok, "null"} ->
-        HTTPoison.request(method, url, "", headers, [hackney: [ssl_options: [versions: [:"tlsv1.2"]]]])
+        HTTPoison.request(method, url, "", headers, [follow_redirect: true, hackney: [ssl_options: [versions: [:"tlsv1.2"]]]])
 
       {:ok, json} ->
         Logger.debug("[JSON] #{inspect json}")
-        HTTPoison.request(method, url, json, headers, [hackney: [ssl_options: [versions: [:"tlsv1.2"]]]])
+        HTTPoison.request(method, url, json, headers, [follow_redirect: true, hackney: [ssl_options: [versions: [:"tlsv1.2"]]]])
 
       error -> error
     end
