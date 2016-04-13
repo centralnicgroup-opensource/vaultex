@@ -136,6 +136,13 @@ defmodule Vaultex.Client do
               _  -> {:error, json_err}
             end
         end
+      {:ok, %HTTPoison.AsyncResponse{id: {:maybe_redirect, _status, headers, _client}}} ->
+        case Enum.find(headers, fn ({key, val}) -> key == "Location" end) do
+          nil ->
+            {:error, "Error redirecting"}
+          {_key, new_url} ->
+            request(method, new_url, params, auth)
+        end
       error -> error
     end
   end
