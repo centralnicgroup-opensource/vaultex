@@ -29,8 +29,9 @@ defmodule Vaultex.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
-      {:hackney, "~> 1.3"},
-      {:poison, "~> 1.5"}
+      {:hackney, ">= 1.3.0"},
+      {:poison, ">= 1.5.0"},
+      {:credo, ">= 0.4.11", only: [:dev, :test]}
     ]
   end
 end

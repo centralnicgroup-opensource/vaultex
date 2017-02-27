@@ -5,57 +5,74 @@ defmodule Vaultex.Client do
   @version "v1"
   @cache Elixir.Vaultex
 
+  @moduledoc ~S"""
+  A GenServer that holds all of the vault state for the keys we asked
+  for in an ETS table. This makes sure we only ask vault if we actually
+  need to but also takes into account vault expire flags so we "forget"
+  about things and have to ask vault for new credentials.
+  """
+
+  @spec start_link() :: {Atom.t, Tumple.t}
   def start_link() do
     GenServer.start_link(__MODULE__, %{progress: "starting"}, name: :vault)
   end
 
+  @spec auth(tuple) :: {Atom.t, Map.t}
   def auth(creds) do
     GenServer.call(:vault, {:auth, creds})
   end
 
+  @spec read(String.t) :: {Atom.t, Map.t}
   def read(key) do
     GenServer.call(:vault, {:read, key})
   end
 
+  @spec write(String.t) :: {Atom.t, Map.t}
   def write(key) do
     GenServer.call(:vault, {:write, key, nil})
   end
 
+  @spec write(String.t, map) :: {Atom.t, Map.t}
   def write(key, data) do
     GenServer.call(:vault, {:write, key, data})
   end
 
+  @spec encrypt(String.t, map) :: {Atom.t, Map.t}
   def encrypt(key, data) do
-    GenServer.call(:vault, {:encrypt, key, data}, 10000)
+    GenServer.call(:vault, {:encrypt, key, data}, 10_000)
   end
 
+  @spec decrypt(String.t, map) :: {Atom.t, Map.t}
   def decrypt(key, data) do
-    GenServer.call(:vault, {:decrypt, key, data}, 10000)
+    GenServer.call(:vault, {:decrypt, key, data}, 10_000)
   end
 
 
 # GenServer callbacks
 
+  @spec init(map) :: {Atom.t, Map.t}
   def init(state) do
     url = "#{get_env(:scheme)}://#{get_env(:host)}:#{get_env(:port)}/#{@version}/"
     {:ok, Map.merge(state, %{url: url})}
   end
 
   # authenticate and save the access token in `token`
+  @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
   def handle_call({:auth, {:user_id, user_id}}, _from, state) do
     app_id = Application.get_env(:vaultex, :app_id, nil)
-    # TODO should call write here now that we have it
-    {:ok, req} = request(:post, "#{state.url}auth/app-id/login", %{app_id: app_id, user_id: user_id})
+    {:ok, req} = write("#{state.url}auth/app-id/login", %{app_id: app_id, user_id: user_id})
     Logger.debug("Got auth reponse: #{inspect req}")
 
     {:reply, {:ok, :authenticated}, Map.merge(state, %{token: req["auth"]["client_token"]})}
   end
+
+  @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
   def handle_call({:auth, {:token, token}}, _from, state) do
     Logger.debug("Merged in token auth")
     {:reply, {:ok, :authenticated}, Map.merge(state, %{token: token})}
   end
 
-
+  @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
   def handle_call({:read, key}, _from, state) do
     data = case :ets.lookup(@cache, key) do
       [] ->
@@ -75,6 +92,7 @@ defmodule Vaultex.Client do
     {:reply, {:ok, data}, state}
   end
 
+  @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
   def handle_call({:write, key, data}, _from, state) do
     case request(:post, state.url <> key, data, state.token) do
       {:ok, req} ->
@@ -86,23 +104,26 @@ defmodule Vaultex.Client do
     end
   end
 
+  @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
   def handle_call({:encrypt, key, data}, _from, state) do
-    data1 = %{data | "plaintext" => data["plaintext"] |> Base.encode64 }
+    data1 = %{data | "plaintext" => data["plaintext"] |> Base.encode64}
     res = request(:post, "#{state.url}transit/encrypt/#{key}", data1, state.token)
     {:reply, res, state}
   end
 
+  @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
   def handle_call({:decrypt, key, data}, _from, state) do
     case request(:post, "#{state.url}transit/decrypt/#{key}", data, state.token) do
       {:ok, data} ->
         {:ok, plain} = data["plaintext"] |> Base.decode64
-        data1 = %{data | "plaintext" => plain }
+        data1 = %{data | "plaintext" => plain}
         {:reply, {:ok, data1}, state}
       error ->
         {:reply, error, state}
     end
   end
 
+  @spec handle_info(tuple, map) :: {atom, map}
   def handle_info({:purge, key}, state) do
     :ets.delete(@cache, key)
     Logger.info("Expired '#{key}' from cache")
@@ -112,9 +133,6 @@ defmodule Vaultex.Client do
 
 # internal helper functions
 
-  defp request(method, url, params) do
-    request(method, url, params, nil)
-  end
   defp request(method, url, params, auth) do
     case get_content(method, url, params, auth) do
       {:ok, code, _headers, body_ref} ->
