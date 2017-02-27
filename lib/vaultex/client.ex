@@ -38,7 +38,7 @@ defmodule Vaultex.Client do
 
   def init(state) do
     url = "#{get_env(:scheme)}://#{get_env(:host)}:#{get_env(:port)}/#{@version}/"
-	{:ok, Map.merge(state, %{url: url})}
+    {:ok, Map.merge(state, %{url: url})}
   end
 
   # authenticate and save the access token in `token`
@@ -48,11 +48,11 @@ defmodule Vaultex.Client do
     {:ok, req} = request(:post, "#{state.url}auth/app-id/login", %{app_id: app_id, user_id: user_id})
     Logger.debug("Got auth reponse: #{inspect req}")
 
-	{:reply, {:ok, :authenticated}, Map.merge(state, %{token: req["auth"]["client_token"]})}
+    {:reply, {:ok, :authenticated}, Map.merge(state, %{token: req["auth"]["client_token"]})}
   end
   def handle_call({:auth, {:token, token}}, _from, state) do
     Logger.debug("Merged in token auth")
-	{:reply, {:ok, :authenticated}, Map.merge(state, %{token: token})}
+    {:reply, {:ok, :authenticated}, Map.merge(state, %{token: token})}
   end
 
 
@@ -77,7 +77,7 @@ defmodule Vaultex.Client do
 
   def handle_call({:write, key, data}, _from, state) do
     case request(:post, state.url <> key, data, state.token) do
-      {:ok, req} -> 
+      {:ok, req} ->
         Logger.debug("Got reponse: #{inspect req}")
         {:reply, {:ok, req}, state}
       {:error, error} ->
@@ -98,7 +98,7 @@ defmodule Vaultex.Client do
         {:ok, plain} = data["plaintext"] |> Base.decode64
         data1 = %{data | "plaintext" => plain }
         {:reply, {:ok, data1}, state}
-      error -> 
+      error ->
         {:reply, error, state}
     end
   end
@@ -120,24 +120,24 @@ defmodule Vaultex.Client do
       {:ok, code, _headers, body_ref} ->
         {:ok, res} = :hackney.body body_ref
         Logger.debug("[body] #{inspect res}")
-		case Poison.decode(res) do
-		  {:ok, json} ->
-			cond do
-			  200 ->
-				{:ok, json}
-			  204 ->
-				{:ok, :no_data}
-			  code in 400..599 ->
-				{:error, {{:http_status, code}, json}}
-			  true ->
-				{:error, res}
-			end
-		  {:error, json_err} ->
+        case Poison.decode(res) do
+          {:ok, json} ->
+            cond do
+            200 ->
+              {:ok, json}
+            204 ->
+              {:ok, :no_data}
+            code in 400..599 ->
+              {:error, {{:http_status, code}, json}}
+            true ->
+              {:error, res}
+            end
+          {:error, json_err} ->
             case res do
               "" -> {:ok, :no_data}
-			  _  -> {:error, json_err}
+              _  -> {:error, json_err}
             end
-		end
+        end
       error -> error
     end
   end
@@ -145,7 +145,7 @@ defmodule Vaultex.Client do
   defp get_content(method, url, params, auth) do
     headers = case auth do
       nil -> [{"Content-Type", "application/json"}]
-      token -> 
+      token ->
         [{"Content-Type", "application/json"}, {"X-Vault-Token", token}]
     end
     Logger.debug("[#{method}] #{url}")
