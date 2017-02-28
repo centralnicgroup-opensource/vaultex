@@ -85,7 +85,7 @@ defmodule Vaultex.Client do
       [] ->
         {:ok, req} = request(:get, state.url <> key, nil, state.token)
         Logger.debug("Got reponse: #{inspect req}")
-        :ets.insert(@cache, {key, req["data"]})
+        :ets.insert(@cache, {key, req})
         case req["lease_duration"] do
           nil -> Logger.debug("No lease duration, no need to purge the key later")
           sec ->
@@ -93,7 +93,7 @@ defmodule Vaultex.Client do
             Logger.debug("Purge the key from our internal cache after #{sec} seconds")
             :erlang.send_after(sec, __MODULE__, {:purge, key})
         end
-        req["data"]
+        req
       [{_, stuff}] -> stuff
     end
     {:reply, {:ok, data}, state}

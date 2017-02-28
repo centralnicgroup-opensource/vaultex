@@ -11,8 +11,8 @@ defmodule VaultexTest do
   test "read secret/foo" do
     # write first then read
     {:ok, _data} = Vaultex.Client.write("secret/foo", %{"value" => "bar"})
-    {:ok, data} = Vaultex.Client.read("secret/foo")
-    assert data == %{"value" => "bar"}
+    {:ok, req} = Vaultex.Client.read("secret/foo")
+    assert req["data"] == %{"value" => "bar"}
   end
 
   test "encrypt some data" do
