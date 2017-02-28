@@ -53,14 +53,21 @@ defmodule Vaultex.Client do
   @spec init(map) :: {Atom.t, Map.t}
   def init(state) do
     url = "#{get_env(:scheme)}://#{get_env(:host)}:#{get_env(:port)}/#{@version}/"
-    {:ok, Map.merge(state, %{url: url})}
+    {:ok, res} = request(:post, "#{url}auth/approle/login", %{role_id: get_env(:role_id), secret_id: get_env(:secret_id)})
+    state1 = state
+    |> Map.put(:url, url)
+    |> Map.put(:token, res["auth"]["client_token"])
+    {:ok, state1}
   end
 
+  # FIXME this is deprecated as far as I can tell since we switched to approle based auth
   # authenticate and save the access token in `token`
   @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
   def handle_call({:auth, {:user_id, user_id}}, _from, state) do
     app_id = Application.get_env(:vaultex, :app_id, nil)
-    {:ok, req} = write("#{state.url}auth/app-id/login", %{app_id: app_id, user_id: user_id})
+    # TODO should call write here now that we have it
+    {:ok, req} = request(:post, "#{state.url}auth/app-id/login", %{app_id: app_id, user_id: user_id})
+    #{:ok, req} = write("#{state.url}auth/app-id/login", %{app_id: app_id, user_id: user_id})
     Logger.debug("Got auth reponse: #{inspect req}")
 
     {:reply, {:ok, :authenticated}, Map.merge(state, %{token: req["auth"]["client_token"]})}
@@ -114,10 +121,9 @@ defmodule Vaultex.Client do
   @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
   def handle_call({:decrypt, key, data}, _from, state) do
     case request(:post, "#{state.url}transit/decrypt/#{key}", data, state.token) do
-      {:ok, data} ->
-        {:ok, plain} = data["plaintext"] |> Base.decode64
-        data1 = %{data | "plaintext" => plain}
-        {:reply, {:ok, data1}, state}
+      {:ok, res} ->
+        data1 = Map.put(res["data"], "plaintext", Base.decode64!(res["data"]["plaintext"]))
+        {:reply, {:ok, %{res | "data" => data1}}, state}
       error ->
         {:reply, error, state}
     end
@@ -132,6 +138,11 @@ defmodule Vaultex.Client do
 
 
 # internal helper functions
+
+  defp request(method, url, params) do
+    request(method, url, params, nil)
+  end
+
 
   defp request(method, url, params, auth) do
     case get_content(method, url, params, auth) do
@@ -150,6 +161,8 @@ defmodule Vaultex.Client do
             true ->
               {:error, res}
             end
+          {:error, :invalid, 0} ->
+            {:ok, :no_data}
           {:error, json_err} ->
             case res do
               "" -> {:ok, :no_data}
@@ -188,5 +201,11 @@ defmodule Vaultex.Client do
   end
   defp get_env(:scheme) do
       System.get_env("VAULT_SCHEME") || Application.get_env(:vaultex, :scheme) || "http"
+  end
+  defp get_env(:role_id) do
+      System.get_env("VAULT_ROLE_ID") || Application.get_env(:vaultex, :role_id)
+  end
+  defp get_env(:secret_id) do
+      System.get_env("VAULT_SECRET_ID") || Application.get_env(:vaultex, :secret_id)
   end
 end
