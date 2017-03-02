@@ -23,3 +23,10 @@ VAULT_SECRET_ID=`curl -X POST -H "X-Vault-Token:$VAULT_TOKEN" http://127.0.0.1:8
 
 echo ${VAULT_ROLE_ID} > .role_id
 echo ${VAULT_SECRET_ID} > .secret_id
+
+echo ""
+echo "******************"
+echo "Vault is running in the background to kill it run:"
+echo "  pkill vault"
+echo "******************"
+echo ""
