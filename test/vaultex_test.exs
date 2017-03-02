@@ -15,6 +15,11 @@ defmodule VaultexTest do
     assert req["data"] == %{"value" => "bar"}
   end
 
+  test "read secret/bar" do
+    req = Vaultex.Client.read("secret/bar")
+    assert req == {:error, :no_data}
+  end
+
   test "encrypt some data" do
     text = "This is secure!"
     {:ok, res} = Vaultex.Client.encrypt("foo", %{"plaintext" => text})

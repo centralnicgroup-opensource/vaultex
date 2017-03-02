@@ -156,8 +156,8 @@ defmodule Vaultex.Client do
   # response
   defp parse_response(res) do
     case res do
-      {:ok, {"errors", []}} -> {:error, :no_data}
-      {:ok, {"errors", error}} -> {:error, error}
+      {:ok, %{"errors" => []}} -> {:error, :no_data}
+      {:ok, %{"errors" => error}} -> {:error, error}
       ok -> ok
     end
   end
