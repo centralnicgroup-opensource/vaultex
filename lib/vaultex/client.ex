@@ -83,20 +83,23 @@ defmodule Vaultex.Client do
   def handle_call({:read, key}, _from, state) do
     data = case :ets.lookup(@cache, key) do
       [] ->
-        {:ok, req} = request(:get, state.url <> key, nil, state.token)
-        Logger.debug("Got reponse: #{inspect req}")
-        :ets.insert(@cache, {key, req})
-        case req["lease_duration"] do
-          nil -> Logger.debug("No lease duration, no need to purge the key later")
-          sec ->
-            # notify me and delete the ETS cache
-            Logger.debug("Purge the key from our internal cache after #{sec} seconds")
-            :erlang.send_after(sec, __MODULE__, {:purge, key})
+        res = request(:get, state.url <> key, nil, state.token)
+              |> parse_response
+        case res do
+          {:ok, response} ->
+            Logger.debug("[->cache] caching reponse for #{key}: #{inspect response}")
+            send_expire(key, response)
+            :ets.insert(@cache, {key, response})
+            {:ok, response}
+          error -> 
+            Logger.error("got error reponse for #{key}: #{inspect error}")
+            error
         end
-        req
-      [{_, stuff}] -> stuff
+      [{_, cached}] -> 
+        Logger.debug("[<-cache] got a cached response for #{key}:#{cached}")
+        {:ok, cached}
     end
-    {:reply, {:ok, data}, state}
+    {:reply, data, state}
   end
 
   @spec handle_call(tuple, pid, map) :: {atom, tuple, map}
@@ -106,7 +109,7 @@ defmodule Vaultex.Client do
         Logger.debug("Got reponse: #{inspect req}")
         {:reply, {:ok, req}, state}
       {:error, error} ->
-        Logger.debug("Got error: #{inspect error}")
+        Logger.error("Got error: #{inspect error}")
         {:reply, {:error, error}, state}
     end
   end
@@ -138,6 +141,26 @@ defmodule Vaultex.Client do
 
 
 # internal helper functions
+
+  defp send_expire(key, response) do
+    case response["lease_duration"] do
+      nil -> Logger.debug("No lease duration, no need to purge the key later")
+      sec ->
+        # notify me and delete the ETS cache
+        Logger.debug("Purge the key from our internal cache after #{sec} seconds")
+        :erlang.send_after(sec, __MODULE__, {:purge, key})
+    end
+  end
+
+  # override some of the strange behaviour in valut and return a more sane
+  # response
+  defp parse_response(res) do
+    case res do
+      {:ok, {:errors, []}} -> {:error, :no_data}
+      {:ok, {:errors, error}} -> {:error, error}
+      ok -> ok
+    end
+  end
 
   defp request(method, url, params) do
     request(method, url, params, nil)
